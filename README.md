@@ -20,12 +20,18 @@ swift build -c release
 
 ## 権限設定
 
-実行に使うターミナルアプリを、次のmacOS設定へ追加してください。
+権限確認は現在の実行プロセスに対して行われます。単独のCLIではなく、次のスクリプトでApp Bundleを作成してください。
+
+```bash
+zsh scripts/package-app.sh "$HOME/Documents/KindleToPDF.app"
+```
+
+作成された`KindleToPDF.app`を、次のmacOS設定へ追加してください。
 
 - システム設定 > プライバシーとセキュリティ > アクセシビリティ
 - システム設定 > プライバシーとセキュリティ > 画面収録
 
-権限を変更した後は、ターミナルアプリを再起動してください。
+権限変更後は、作成したApp Bundle内の実行ファイルを使います。再ビルドするとadhoc署名が変わるため、権限を再登録してください。
 
 ## 使い方
 
@@ -35,7 +41,7 @@ swift build -c release
 4. Kindleウィンドウを最小化せずに、次のコマンドを実行する。
 
 ```bash
-.build/release/kindle-to-pdf capture \
+"$HOME/Documents/KindleToPDF.app/Contents/MacOS/kindle-to-pdf" capture \
   --output "$PWD/book.pdf" \
   --pages 200
 ```
@@ -43,7 +49,7 @@ swift build -c release
 `--pages`は現在表示中のページを1ページ目として数えます。Kindleウィンドウが複数ある場合は、タイトルを指定できます。
 
 ```bash
-.build/release/kindle-to-pdf capture \
+"$HOME/Documents/KindleToPDF.app/Contents/MacOS/kindle-to-pdf" capture \
   --output "$PWD/book.pdf" \
   --pages 200 \
   --window "Kindle - Book"
@@ -52,7 +58,7 @@ swift build -c release
 ページ送りが反応しない場合は、PageDownへ変更できます。
 
 ```bash
-.build/release/kindle-to-pdf capture \
+"$HOME/Documents/KindleToPDF.app/Contents/MacOS/kindle-to-pdf" capture \
   --output "$PWD/book.pdf" \
   --pages 200 \
   --next-key pagedown
@@ -74,7 +80,7 @@ book.kindle-session/
 同じ本を同じ開始位置でKindleに開き、次のコマンドで再開します。
 
 ```bash
-.build/release/kindle-to-pdf capture \
+"$HOME/Documents/KindleToPDF.app/Contents/MacOS/kindle-to-pdf" capture \
   --output "$PWD/book.pdf" \
   --pages 200 \
   --resume
