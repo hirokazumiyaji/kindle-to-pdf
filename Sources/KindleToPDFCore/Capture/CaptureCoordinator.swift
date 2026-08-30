@@ -75,7 +75,7 @@ public final class CaptureCoordinator {
             state = SessionState(
                 schemaVersion: 1,
                 outputPath: options.outputURL.path,
-                requestedPageCount: options.pageCount,
+                requestedPageCount: options.requestedPageCountForSession,
                 capturedPageCount: 1,
                 windowTitle: window.title,
                 windowID: window.windowID,
@@ -86,17 +86,19 @@ public final class CaptureCoordinator {
             try store.save(state)
         }
 
-        while state.capturedPageCount < options.pageCount {
+        var activeKey = options.nextKey
+        while shouldCaptureMore(state: state, options: options) {
             if stopRequested() {
                 throw CaptureError.stopRequested
             }
-            let nextImage = try waitForPage(
+            guard let nextImage = try advancePage(
                 after: previousImage,
                 window: window,
-                nextKey: options.nextKey,
-                stopRequested: stopRequested,
-                pageNumber: state.capturedPageCount + 1
-            )
+                activeKey: &activeKey,
+                stopRequested: stopRequested
+            ) else {
+                break
+            }
             let pageData = try imageCodec.encode(nextImage)
             let nextPage = state.capturedPageCount + 1
             try store.savePage(pageData, index: nextPage)
@@ -114,13 +116,49 @@ public final class CaptureCoordinator {
         try store.save(state)
     }
 
+    private func shouldCaptureMore(state: SessionState, options: CaptureOptions) -> Bool {
+        guard let pageCount = options.pageCount else {
+            return true
+        }
+        return state.capturedPageCount < pageCount
+    }
+
+    private func advancePage(
+        after previousImage: CGImage,
+        window: KindleWindow,
+        activeKey: inout NextKey,
+        stopRequested: () -> Bool
+    ) throws -> CGImage? {
+        if let image = try waitForPage(
+            after: previousImage,
+            window: window,
+            nextKey: activeKey,
+            stopRequested: stopRequested
+        ) {
+            return image
+        }
+
+        guard let alternate = activeKey.alternate, alternate != activeKey else {
+            return nil
+        }
+        if let image = try waitForPage(
+            after: previousImage,
+            window: window,
+            nextKey: alternate,
+            stopRequested: stopRequested
+        ) {
+            activeKey = alternate
+            return image
+        }
+        return nil
+    }
+
     private func waitForPage(
         after previousImage: CGImage,
         window: KindleWindow,
         nextKey: NextKey,
-        stopRequested: () -> Bool,
-        pageNumber: Int
-    ) throws -> CGImage {
+        stopRequested: () -> Bool
+    ) throws -> CGImage? {
         var samples: [CGImage] = []
         var turnAttempts = 0
         var pollsSinceLastTurn = 0
@@ -159,7 +197,7 @@ public final class CaptureCoordinator {
                 return image
             }
         }
-        throw CaptureError.pageDidNotChange(pageNumber)
+        return nil
     }
 
     private func sendPageTurn(window: KindleWindow, key: NextKey) throws {
@@ -179,15 +217,19 @@ public final class CaptureCoordinator {
         guard state.outputPath == options.outputURL.path else {
             throw CaptureError.invalidResume("出力先が一致しません。")
         }
-        guard state.requestedPageCount == options.pageCount else {
+        guard state.requestedPageCount == options.requestedPageCountForSession else {
             throw CaptureError.invalidResume("取得ページ数が一致しません。")
         }
         guard state.status == .capturing else {
             throw CaptureError.invalidResume("セッションは既に完了しています。")
         }
-        guard state.capturedPageCount > 0,
-              state.capturedPageCount <= state.requestedPageCount else {
+        guard state.capturedPageCount > 0 else {
             throw CaptureError.invalidResume("保存済みページ数が不正です。")
+        }
+        if state.requestedPageCount > 0 {
+            guard state.capturedPageCount <= state.requestedPageCount else {
+                throw CaptureError.invalidResume("保存済みページ数が不正です。")
+            }
         }
         for url in store.pageURLs(count: state.capturedPageCount) {
             guard FileManager.default.fileExists(atPath: url.path) else {

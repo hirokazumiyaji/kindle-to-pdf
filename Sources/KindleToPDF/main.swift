@@ -50,13 +50,14 @@ struct KindleToPDFCLI {
 
     private static let usage = """
     Usage:
-      kindle-to-pdf capture --output <path> --pages <count> [options]
+      kindle-to-pdf capture --output <path> [--pages <count>] [options]
 
     Options:
-      --window <title>             Kindleウィンドウのタイトル
-      --next-key <right|pagedown>  ページ送りキー（既定: right）
-      --session <path>             セッションディレクトリ
-      --resume                     未完了セッションを再開
-      --overwrite                  既存PDFを上書き
+      --pages <count>                    取得ページ数（省略時は最終ページまで）
+      --window <title>                   Kindleウィンドウのタイトル
+      --next-key <right|left|pagedown>   ページ送りキー（既定: right、進まなければ左右を自動切替）
+      --session <path>                   セッションディレクトリ
+      --resume                           未完了セッションを再開
+      --overwrite                        既存PDFを上書き
     """
 }

@@ -9,6 +9,8 @@ public struct MacOSPageTurner: PageTurning {
         switch key {
         case .right:
             virtualKey = CGKeyCode(kVK_RightArrow)
+        case .left:
+            virtualKey = CGKeyCode(kVK_LeftArrow)
         case .pagedown:
             virtualKey = CGKeyCode(kVK_PageDown)
         }

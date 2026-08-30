@@ -56,9 +56,6 @@ public enum CLIParser {
         guard let outputURL else {
             throw CLIError.missingOption("--output")
         }
-        guard let pageCount else {
-            throw CLIError.missingOption("--pages")
-        }
 
         return .capture(CaptureOptions(
             outputURL: outputURL,

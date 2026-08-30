@@ -19,13 +19,13 @@ final class CaptureCoordinatorTests: XCTestCase {
         let fixture = try CaptureFixture(images: [.black, .black])
         let options = fixture.options(pageCount: 2)
 
-        XCTAssertThrowsError(try fixture.coordinator.run(
+        try fixture.coordinator.run(
             options: options,
             stopRequested: { false }
-        ))
+        )
 
         XCTAssertEqual(fixture.savedPageCount, 1)
-        XCTAssertEqual(fixture.pdfWriter.writtenImageCount, 0)
+        XCTAssertEqual(fixture.pdfWriter.writtenImageCount, 1)
     }
 
     func testWaitsForPageThatTakesLongerThanFiveSecondsToRender() throws {
@@ -101,15 +101,44 @@ final class CaptureCoordinatorTests: XCTestCase {
             pageTurner: GatedPageTurner(gate: shared)
         )
 
-        XCTAssertThrowsError(try fixture.coordinator.run(
+        try fixture.coordinator.run(
             options: fixture.options(pageCount: 2),
             stopRequested: { false }
-        )) { error in
-            XCTAssertEqual(error as? CaptureError, .pageDidNotChange(2))
-        }
+        )
 
-        XCTAssertEqual(shared.turnCount, 3)
         XCTAssertEqual(fixture.savedPageCount, 1)
+        XCTAssertEqual(fixture.pdfWriter.writtenImageCount, 1)
+        XCTAssertGreaterThanOrEqual(shared.turnCount, 3)
+    }
+
+    func testSwitchesToLeftWhenRightDoesNotAdvance() throws {
+        let gate = KeySensitiveGate(workingKey: .left)
+        let fixture = CaptureFixture(
+            capture: KeyGatedWindowCapture(gate: gate, before: try makeImage(color: .black), after: try makeImage(color: .white)),
+            pageTurner: KeyGatedPageTurner(gate: gate)
+        )
+
+        try fixture.coordinator.run(
+            options: fixture.options(pageCount: 2),
+            stopRequested: { false }
+        )
+
+        XCTAssertTrue(gate.keys.contains(.right))
+        XCTAssertTrue(gate.keys.contains(.left))
+        XCTAssertEqual(fixture.savedPageCount, 2)
+        XCTAssertEqual(fixture.pdfWriter.writtenImageCount, 2)
+    }
+
+    func testCompletesWhenPageStopsChangingWithoutPageLimit() throws {
+        let fixture = try CaptureFixture(images: [.black, .white, .white, .white])
+
+        try fixture.coordinator.run(
+            options: fixture.options(pageCount: nil),
+            stopRequested: { false }
+        )
+
+        XCTAssertEqual(fixture.savedPageCount, 2)
+        XCTAssertEqual(fixture.pdfWriter.writtenImageCount, 2)
     }
 }
 
@@ -191,6 +220,55 @@ private final class TurnGatedWindowCapture: WindowCapturing {
     }
 }
 
+private final class KeySensitiveGate {
+    let workingKey: NextKey
+    private(set) var keys: [NextKey] = []
+    private var workingTurnCount = 0
+
+    init(workingKey: NextKey) {
+        self.workingKey = workingKey
+    }
+
+    func record(_ key: NextKey) {
+        keys.append(key)
+        if key == workingKey {
+            workingTurnCount += 1
+        }
+    }
+
+    var hasChanged: Bool {
+        workingTurnCount >= 1
+    }
+}
+
+private final class KeyGatedPageTurner: PageTurning {
+    private let gate: KeySensitiveGate
+
+    init(gate: KeySensitiveGate) {
+        self.gate = gate
+    }
+
+    func turn(window: KindleWindow, key: NextKey) throws {
+        gate.record(key)
+    }
+}
+
+private final class KeyGatedWindowCapture: WindowCapturing {
+    private let gate: KeySensitiveGate
+    private let before: CGImage
+    private let after: CGImage
+
+    init(gate: KeySensitiveGate, before: CGImage, after: CGImage) {
+        self.gate = gate
+        self.before = before
+        self.after = after
+    }
+
+    func capture(window: KindleWindow) throws -> CGImage {
+        gate.hasChanged ? after : before
+    }
+}
+
 private final class RecordingPDFWriter: PDFWriting {
     private(set) var writtenImageCount = 0
 
@@ -259,7 +337,7 @@ private final class CaptureFixture {
         )
     }
 
-    func options(pageCount: Int, resume: Bool = false) -> CaptureOptions {
+    func options(pageCount: Int?, resume: Bool = false) -> CaptureOptions {
         CaptureOptions(
             outputURL: outputURL,
             pageCount: pageCount,

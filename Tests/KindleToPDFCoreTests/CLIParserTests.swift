@@ -20,8 +20,34 @@ final class CLIParserTests: XCTestCase {
         )))
     }
 
-    func testRejectsMissingPageCount() {
-        XCTAssertThrowsError(try CLIParser.parse(["capture", "--output", "book.pdf"]))
+    func testAllowsMissingPageCount() throws {
+        let command = try CLIParser.parse(["capture", "--output", "book.pdf"])
+
+        XCTAssertEqual(command, .capture(CaptureOptions(
+            outputURL: URL(fileURLWithPath: "book.pdf"),
+            pageCount: nil,
+            windowTitle: nil,
+            nextKey: .right,
+            sessionURL: nil,
+            resume: false,
+            overwrite: false
+        )))
+    }
+
+    func testParsesLeftNextKey() throws {
+        let command = try CLIParser.parse([
+            "capture", "--output", "book.pdf", "--next-key", "left"
+        ])
+
+        XCTAssertEqual(command, .capture(CaptureOptions(
+            outputURL: URL(fileURLWithPath: "book.pdf"),
+            pageCount: nil,
+            windowTitle: nil,
+            nextKey: .left,
+            sessionURL: nil,
+            resume: false,
+            overwrite: false
+        )))
     }
 
     func testUsesRightKeyAndNoOptionalFlagsByDefault() throws {

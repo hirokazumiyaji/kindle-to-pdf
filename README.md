@@ -30,6 +30,7 @@ zsh scripts/package-app.sh "$HOME/Documents/KindleToPDF.app"
 
 - システム設定 > プライバシーとセキュリティ > アクセシビリティ
 - システム設定 > プライバシーとセキュリティ > 画面収録
+- システム設定 > プライバシーとセキュリティ > オートメーション（Kindleの操作を求められた場合）
 
 権限変更後は、作成したApp Bundle内の実行ファイルを使います。再ビルドするとadhoc署名が変わるため、権限を再登録してください。
 
@@ -42,6 +43,13 @@ zsh scripts/package-app.sh "$HOME/Documents/KindleToPDF.app"
 
 ```bash
 "$HOME/Documents/KindleToPDF.app/Contents/MacOS/kindle-to-pdf" capture \
+  --output "$PWD/book.pdf"
+```
+
+`--pages`を省略すると、画面が変わらなくなるまで（最終ページまで）取得します。上限を付ける場合だけ指定します。
+
+```bash
+"$HOME/Documents/KindleToPDF.app/Contents/MacOS/kindle-to-pdf" capture \
   --output "$PWD/book.pdf" \
   --pages 200
 ```
@@ -51,17 +59,15 @@ zsh scripts/package-app.sh "$HOME/Documents/KindleToPDF.app"
 ```bash
 "$HOME/Documents/KindleToPDF.app/Contents/MacOS/kindle-to-pdf" capture \
   --output "$PWD/book.pdf" \
-  --pages 200 \
-  --window "Kindle - Book"
+  --window "Kindle"
 ```
 
-ページ送りが反応しない場合は、PageDownへ変更できます。
+既定のページ送りは右矢印です。進まない場合は左矢印へ自動切替します（縦書き向け）。固定したい場合は`--next-key`を指定します。
 
 ```bash
 "$HOME/Documents/KindleToPDF.app/Contents/MacOS/kindle-to-pdf" capture \
   --output "$PWD/book.pdf" \
-  --pages 200 \
-  --next-key pagedown
+  --next-key left
 ```
 
 ## 停止と再開
@@ -77,12 +83,11 @@ book.kindle-session/
     0002.png
 ```
 
-同じ本を同じ開始位置でKindleに開き、次のコマンドで再開します。
+同じ本を同じ開始位置でKindleに開き、次のコマンドで再開します。`--pages`を最初に指定していた場合は同じ値を付けてください。
 
 ```bash
 "$HOME/Documents/KindleToPDF.app/Contents/MacOS/kindle-to-pdf" capture \
   --output "$PWD/book.pdf" \
-  --pages 200 \
   --resume
 ```
 
@@ -92,6 +97,6 @@ book.kindle-session/
 
 - 出力は画面画像を並べた画像PDFです。OCRやテキスト検索には対応しません。
 - Kindleウィンドウを最小化・非表示にした状態は保証対象外です。
-- Kindleアプリがバックグラウンドのページ送りを受け付けない環境では、別作業と同時に動作しない場合があります。
-- ページ画像に変化がない場合は、重複ページを追加せず停止します。
+- ページ送りのため、実行中はKindleを前面化します。別作業と同時には使いにくい場合があります。
+- どちらの方向にもページが進まない場合は、最終ページと判断してそこまでのPDFを作成します。
 - 四隅から均一と判断できる外周背景の余白は自動で除去します。ページ内部の余白は保持し、外周背景を確実に判定できない画像は変更しません。
