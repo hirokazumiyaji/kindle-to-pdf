@@ -164,6 +164,7 @@ public final class CaptureCoordinator {
 
     private func sendPageTurn(window: KindleWindow, key: NextKey) throws {
         try applicationActivator.activate(processID: window.processID)
+        try sleeper.sleep(for: 0.2)
         try pageTurner.turn(window: window, key: key)
     }
 
