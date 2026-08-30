@@ -3,6 +3,7 @@ import CoreGraphics
 public struct EdgeBackgroundCropper {
     private static let tolerance = 16
     private static let backgroundRatio = 0.995
+    private static let minimumContentRatio = 0.5
 
     public init() {}
 
@@ -60,7 +61,23 @@ public struct EdgeBackgroundCropper {
             height: bottom - top + 1
         )
         let originalBounds = CGRect(x: 0, y: 0, width: image.width, height: image.height)
-        guard rectangle != originalBounds else {
+        guard rectangle != originalBounds,
+              hasStrongContentSupport(
+                (0..<image.width).map { pixel(atX: $0, y: top, pixels: pixels, width: image.width) },
+                background: background
+              ),
+              hasStrongContentSupport(
+                (0..<image.width).map { pixel(atX: $0, y: bottom, pixels: pixels, width: image.width) },
+                background: background
+              ),
+              hasStrongContentSupport(
+                (0..<image.height).map { pixel(atX: left, y: $0, pixels: pixels, width: image.width) },
+                background: background
+              ),
+              hasStrongContentSupport(
+                (0..<image.height).map { pixel(atX: right, y: $0, pixels: pixels, width: image.width) },
+                background: background
+              ) else {
             return image
         }
 
@@ -140,6 +157,10 @@ public struct EdgeBackgroundCropper {
                 && channelDifference(pixel.blue, background.blue) <= Self.tolerance
         }
         return Double(backgroundPixels.count) / Double(pixels.count)
+    }
+
+    private func hasStrongContentSupport(_ pixels: [RGB], background: RGB) -> Bool {
+        1 - backgroundPixelRatio(pixels, background: background) >= Self.minimumContentRatio
     }
 
     private func pixel(atX x: Int, y: Int, pixels: [UInt8], width: Int) -> RGB {

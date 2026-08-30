@@ -10,7 +10,7 @@ final class CaptureCoordinatorTests: XCTestCase {
 
         try fixture.coordinator.run(options: options, stopRequested: { false })
 
-        XCTAssertEqual(fixture.pageTurner.turnCount, 2)
+        XCTAssertEqual((fixture.pageTurner as! RecordingPageTurner).turnCount, 2)
         XCTAssertEqual(fixture.savedPageCount, 3)
         XCTAssertEqual(fixture.pdfWriter.writtenImageCount, 3)
     }
@@ -28,6 +28,31 @@ final class CaptureCoordinatorTests: XCTestCase {
         XCTAssertEqual(fixture.pdfWriter.writtenImageCount, 0)
     }
 
+    func testWaitsForPageThatTakesLongerThanFiveSecondsToRender() throws {
+        var transitionImages: [CGImage] = [try makeImage(color: .black)]
+        for index in 0..<20 {
+            let color = FixtureRGB(
+                red: UInt8(20 + index),
+                green: UInt8(40 + index),
+                blue: UInt8(60 + index)
+            )
+            transitionImages.append(makeImage(width: 2, height: 2, fill: color, rectangles: []))
+        }
+        transitionImages.append(contentsOf: [
+            try makeImage(color: .white),
+            try makeImage(color: .white)
+        ])
+        let fixture = CaptureFixture(capturedImages: transitionImages)
+
+        try fixture.coordinator.run(
+            options: fixture.options(pageCount: 2),
+            stopRequested: { false }
+        )
+
+        XCTAssertEqual(fixture.savedPageCount, 2)
+        XCTAssertEqual(fixture.pdfWriter.writtenImageCount, 2)
+    }
+
     func testResumeUsesTheNextPageAfterSavedPages() throws {
         let fixture = try CaptureFixture(images: [.white, .white])
         try fixture.seedSession(capturedPageCount: 1)
@@ -38,7 +63,53 @@ final class CaptureCoordinatorTests: XCTestCase {
         )
 
         XCTAssertEqual(fixture.savedPageCount, 2)
-        XCTAssertEqual(fixture.pageTurner.turnCount, 1)
+        XCTAssertEqual((fixture.pageTurner as! RecordingPageTurner).turnCount, 1)
+    }
+
+    func testRetriesPageTurnWhenImageDoesNotChangeInitially() throws {
+        let shared = TurnGate(turnsBeforeChange: 2)
+        let fixture = CaptureFixture(
+            capture: TurnGatedWindowCapture(gate: shared, before: try makeImage(color: .black), after: try makeImage(color: .white)),
+            pageTurner: GatedPageTurner(gate: shared)
+        )
+
+        try fixture.coordinator.run(
+            options: fixture.options(pageCount: 2),
+            stopRequested: { false }
+        )
+
+        XCTAssertEqual(shared.turnCount, 2)
+        XCTAssertEqual(fixture.savedPageCount, 2)
+    }
+
+    func testActivatesApplicationBeforeEachPageTurn() throws {
+        let fixture = try CaptureFixture(images: [.black, .white, .white, .black, .black])
+        let activator = fixture.applicationActivator
+
+        try fixture.coordinator.run(
+            options: fixture.options(pageCount: 3),
+            stopRequested: { false }
+        )
+
+        XCTAssertEqual(activator.activatedProcessIDs, [2, 2])
+    }
+
+    func testGivesUpAfterExhaustingPageTurnRetries() throws {
+        let shared = TurnGate(turnsBeforeChange: 100)
+        let fixture = CaptureFixture(
+            capture: TurnGatedWindowCapture(gate: shared, before: try makeImage(color: .black), after: try makeImage(color: .white)),
+            pageTurner: GatedPageTurner(gate: shared)
+        )
+
+        XCTAssertThrowsError(try fixture.coordinator.run(
+            options: fixture.options(pageCount: 2),
+            stopRequested: { false }
+        )) { error in
+            XCTAssertEqual(error as? CaptureError, .pageDidNotChange(2))
+        }
+
+        XCTAssertEqual(shared.turnCount, 3)
+        XCTAssertEqual(fixture.savedPageCount, 1)
     }
 }
 
@@ -59,6 +130,64 @@ private final class RecordingPageTurner: PageTurning {
 
     func turn(window: KindleWindow, key: NextKey) throws {
         turnCount += 1
+    }
+}
+
+private final class RecordingApplicationActivator: ApplicationActivating {
+    private(set) var activatedProcessIDs: [Int32] = []
+
+    func activate(processID: Int32) throws {
+        activatedProcessIDs.append(processID)
+    }
+}
+
+private final class TurnGate {
+    private let turnsBeforeChange: Int
+    private(set) var turnCount = 0
+
+    init(turnsBeforeChange: Int) {
+        self.turnsBeforeChange = turnsBeforeChange
+    }
+
+    func recordTurn() {
+        turnCount += 1
+    }
+
+    var hasChanged: Bool {
+        turnCount >= turnsBeforeChange
+    }
+}
+
+private final class GatedPageTurner: PageTurning {
+    private let gate: TurnGate
+
+    init(gate: TurnGate) {
+        self.gate = gate
+    }
+
+    func turn(window: KindleWindow, key: NextKey) throws {
+        gate.recordTurn()
+    }
+}
+
+private final class TurnGatedWindowCapture: WindowCapturing {
+    private let gate: TurnGate
+    private let before: CGImage
+    private let after: CGImage
+    private var afterChangeSamples = 0
+
+    init(gate: TurnGate, before: CGImage, after: CGImage) {
+        self.gate = gate
+        self.before = before
+        self.after = after
+    }
+
+    func capture(window: KindleWindow) throws -> CGImage {
+        if gate.hasChanged {
+            afterChangeSamples += 1
+            return after
+        }
+        return before
     }
 }
 
@@ -93,22 +222,36 @@ private final class CaptureFixture {
     let outputURL: URL
     let sessionURL: URL
     let store: SessionStore
-    let pageTurner = RecordingPageTurner()
+    let pageTurner: PageTurning
+    let applicationActivator: RecordingApplicationActivator
     let pdfWriter = RecordingPDFWriter()
     let coordinator: CaptureCoordinator
 
-    init(images: [FixtureColor]) throws {
+    convenience init(images: [FixtureColor]) throws {
+        self.init(capturedImages: try images.map { try makeImage(color: $0) })
+    }
+
+    convenience init(capturedImages: [CGImage]) {
+        self.init(
+            capture: FixtureWindowCapture(images: capturedImages),
+            pageTurner: RecordingPageTurner()
+        )
+    }
+
+    init(capture: WindowCapturing, pageTurner: PageTurning) {
         let rootURL = FileManager.default.temporaryDirectory
             .appendingPathComponent(UUID().uuidString)
         outputURL = rootURL.appendingPathComponent("book.pdf")
         sessionURL = rootURL.appendingPathComponent("book.kindle-session")
         store = SessionStore(rootURL: sessionURL)
-        let capturedImages = try images.map { try makeImage(color: $0) }
+        self.pageTurner = pageTurner
+        applicationActivator = RecordingApplicationActivator()
         coordinator = CaptureCoordinator(
             windowLocator: FixtureWindowLocator(),
             permissionChecker: AllowingPermissionChecker(),
             pageTurner: pageTurner,
-            windowCapture: FixtureWindowCapture(images: capturedImages),
+            applicationActivator: applicationActivator,
+            windowCapture: capture,
             imageCodec: PNGImageCodec(),
             imageChangeDetector: ImageChangeDetector(changedPixelRatio: 0.01),
             pdfWriter: pdfWriter,

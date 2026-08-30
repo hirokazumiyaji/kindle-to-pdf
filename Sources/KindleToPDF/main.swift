@@ -27,6 +27,7 @@ struct KindleToPDFCLI {
                     windowLocator: MacOSWindowLocator(),
                     permissionChecker: MacOSPermissionChecker(),
                     pageTurner: MacOSPageTurner(),
+                    applicationActivator: MacOSApplicationActivator(),
                     windowCapture: MacOSWindowCapture(),
                     imageCodec: PNGImageCodec(),
                     imageChangeDetector: ImageChangeDetector(),

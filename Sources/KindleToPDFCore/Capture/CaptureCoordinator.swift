@@ -6,18 +6,22 @@ public final class CaptureCoordinator {
     private let windowLocator: WindowLocating
     private let permissionChecker: PermissionChecking
     private let pageTurner: PageTurning
+    private let applicationActivator: ApplicationActivating
     private let windowCapture: WindowCapturing
     private let imageCodec: PNGImageCodec
     private let imageChangeDetector: ImageChangeDetector
     private let pdfWriter: PDFWriting
     private let sleeper: Sleeper
-    private let stabilityAttempts = 20
+    private let stabilityAttempts = 60
     private let stabilityInterval: TimeInterval = 0.25
+    private let maxTurnAttempts = 3
+    private let pollsBeforeRetry = 20
 
     public init(
         windowLocator: WindowLocating,
         permissionChecker: PermissionChecking,
         pageTurner: PageTurning,
+        applicationActivator: ApplicationActivating,
         windowCapture: WindowCapturing,
         imageCodec: PNGImageCodec,
         imageChangeDetector: ImageChangeDetector,
@@ -27,6 +31,7 @@ public final class CaptureCoordinator {
         self.windowLocator = windowLocator
         self.permissionChecker = permissionChecker
         self.pageTurner = pageTurner
+        self.applicationActivator = applicationActivator
         self.windowCapture = windowCapture
         self.imageCodec = imageCodec
         self.imageChangeDetector = imageChangeDetector
@@ -85,10 +90,10 @@ public final class CaptureCoordinator {
             if stopRequested() {
                 throw CaptureError.stopRequested
             }
-            try pageTurner.turn(window: window, key: options.nextKey)
             let nextImage = try waitForPage(
                 after: previousImage,
                 window: window,
+                nextKey: options.nextKey,
                 stopRequested: stopRequested,
                 pageNumber: state.capturedPageCount + 1
             )
@@ -112,21 +117,39 @@ public final class CaptureCoordinator {
     private func waitForPage(
         after previousImage: CGImage,
         window: KindleWindow,
+        nextKey: NextKey,
         stopRequested: () -> Bool,
         pageNumber: Int
     ) throws -> CGImage {
         var samples: [CGImage] = []
+        var turnAttempts = 0
+        var pollsSinceLastTurn = 0
+        var sawChange = false
+
+        try sendPageTurn(window: window, key: nextKey)
+        turnAttempts = 1
+
         for _ in 0..<stabilityAttempts {
             if stopRequested() {
                 throw CaptureError.stopRequested
             }
             try sleeper.sleep(for: stabilityInterval)
             let image = try windowCapture.capture(window: window)
+            pollsSinceLastTurn += 1
+
             guard try imageChangeDetector.hasChanged(previousImage, image) else {
                 samples.removeAll(keepingCapacity: true)
+                if !sawChange,
+                   pollsSinceLastTurn >= pollsBeforeRetry,
+                   turnAttempts < maxTurnAttempts {
+                    try sendPageTurn(window: window, key: nextKey)
+                    turnAttempts += 1
+                    pollsSinceLastTurn = 0
+                }
                 continue
             }
 
+            sawChange = true
             if let last = samples.last, try imageChangeDetector.hasChanged(last, image) {
                 samples = [image]
             } else {
@@ -137,6 +160,11 @@ public final class CaptureCoordinator {
             }
         }
         throw CaptureError.pageDidNotChange(pageNumber)
+    }
+
+    private func sendPageTurn(window: KindleWindow, key: NextKey) throws {
+        try applicationActivator.activate(processID: window.processID)
+        try pageTurner.turn(window: window, key: key)
     }
 
     private func validateResume(

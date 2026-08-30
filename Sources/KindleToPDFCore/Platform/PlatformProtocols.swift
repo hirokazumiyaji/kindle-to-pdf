@@ -8,6 +8,10 @@ public protocol PageTurning {
     func turn(window: KindleWindow, key: NextKey) throws
 }
 
+public protocol ApplicationActivating {
+    func activate(processID: Int32) throws
+}
+
 public protocol WindowCapturing {
     func capture(window: KindleWindow) throws -> CGImage
 }
