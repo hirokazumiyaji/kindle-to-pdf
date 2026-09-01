@@ -76,9 +76,10 @@ KindleToPDF/
   PDFs/
     <book-id>.pdf
   Settings/
-    settings.json           # アプリ全体設定
-    crop-defaults.json      # グローバル手動クロップ inset
+    settings.json           # アプリ全体設定（グローバル手動クロップ inset を含む）
 ```
+
+実装では `crop-defaults.json` は使わない。inset は `settings.json` の `globalCropInsets` にのみ保存し、二重管理を避ける。
 
 ### 書籍エントリ（`Library/<book-id>.json`）
 
@@ -100,7 +101,7 @@ KindleToPDF/
 - 既定のめくりキー（`right` / `left` / `pagedown`）
 - ページ上限の既定（null 可）
 - 自動クロップのオンオフ
-- グローバル手動 inset（上下左右 px）
+- グローバル手動 inset（上下左右 px）。別ファイル `crop-defaults.json` は持たない
 
 ### CLI との関係
 
