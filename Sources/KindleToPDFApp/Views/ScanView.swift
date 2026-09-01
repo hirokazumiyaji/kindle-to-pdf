@@ -42,6 +42,10 @@ struct ScanView: View {
 
             Section("進捗") {
                 Text("\(viewModel.capturedPageCount) ページ")
+                if viewModel.resume {
+                    Text("未完了セッションを再開します")
+                        .foregroundStyle(.secondary)
+                }
                 if !viewModel.statusMessage.isEmpty {
                     Text(viewModel.statusMessage)
                 }
@@ -75,6 +79,10 @@ struct ScanView: View {
         .padding()
         .onAppear {
             viewModel.refreshWindows()
+            model.applyPendingResumeIfNeeded()
+        }
+        .onChange(of: model.pendingResume) { _ in
+            model.applyPendingResumeIfNeeded()
         }
     }
 }

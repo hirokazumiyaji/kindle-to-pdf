@@ -17,11 +17,19 @@ final class AppModel: ObservableObject {
             self?.settings ?? .default
         }
     )
+    lazy var libraryViewModel: LibraryViewModel = LibraryViewModel(
+        store: libraryStore,
+        onResume: { [weak self] entry in
+            self?.pendingResume = entry
+            self?.selectedSection = .scan
+        }
+    )
 
     @Published var selectedSection: AppSection = .scan
     @Published var settings: AppSettings
     @Published var permissionStatus: PermissionStatus
     @Published var showPermissionSheet = false
+    @Published var pendingResume: BookEntry?
 
     var needsPermissionSetup: Bool {
         !permissionStatus.accessibility || !permissionStatus.screenRecording
@@ -67,5 +75,11 @@ final class AppModel: ObservableObject {
             return true
         }
         return false
+    }
+
+    func applyPendingResumeIfNeeded() {
+        guard let entry = pendingResume else { return }
+        scanViewModel.applyPendingResume(entry)
+        pendingResume = nil
     }
 }

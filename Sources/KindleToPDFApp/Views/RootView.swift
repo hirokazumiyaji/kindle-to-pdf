@@ -13,6 +13,8 @@ struct RootView: View {
             switch model.selectedSection {
             case .scan:
                 ScanView(viewModel: model.scanViewModel)
+            case .library:
+                LibraryView(viewModel: model.libraryViewModel)
             case .settings:
                 SettingsView(viewModel: model.settingsViewModel)
             default:

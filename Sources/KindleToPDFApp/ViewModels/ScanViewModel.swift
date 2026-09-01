@@ -13,8 +13,10 @@ final class ScanViewModel: ObservableObject {
     @Published var statusMessage = ""
     @Published var errorMessage: String?
     @Published var availableWindows: [KindleWindow] = []
+    @Published var resume = false
 
     private let libraryStore: LibraryStore
+    private var resumeEntryID: UUID?
     private let windowListing: any WindowListing
     private let presentPermissionsIfNeeded: () -> Bool
     private let settingsProvider: () -> AppSettings
@@ -44,6 +46,16 @@ final class ScanViewModel: ObservableObject {
         }
     }
 
+    func applyPendingResume(_ entry: BookEntry) {
+        resume = true
+        resumeEntryID = entry.id
+        displayName = entry.displayName
+        pageCountText = entry.requestedPageCount.map(String.init) ?? ""
+        capturedPageCount = entry.capturedPageCount
+        errorMessage = nil
+        statusMessage = "未完了セッションを再開します"
+    }
+
     func start() {
         guard !isRunning else { return }
         if presentPermissionsIfNeeded() { return }
@@ -68,13 +80,32 @@ final class ScanViewModel: ObservableObject {
             return
         }
 
-        let entry = libraryStore.makeNewEntry(displayName: name, requestedPageCount: pageCount)
-        do {
-            try libraryStore.save(entry)
-        } catch {
-            errorMessage = Self.message(for: error)
-            return
+        let entry: BookEntry
+        if resume, let resumeID = resumeEntryID {
+            do {
+                var existing = try libraryStore.load(id: resumeID)
+                if existing.displayName != name {
+                    existing.displayName = name
+                    try libraryStore.save(existing)
+                }
+                entry = existing
+            } catch {
+                errorMessage = Self.message(for: error)
+                return
+            }
+        } else {
+            let created = libraryStore.makeNewEntry(displayName: name, requestedPageCount: pageCount)
+            do {
+                try libraryStore.save(created)
+            } catch {
+                errorMessage = Self.message(for: error)
+                return
+            }
+            entry = created
         }
+        let shouldResume = resume
+        resume = false
+        resumeEntryID = nil
 
         let insetsSource = entry.cropOverride ?? settings.globalCropInsets
         let insets: CropInsets? = insetsSource.isZero ? nil : insetsSource
@@ -89,14 +120,16 @@ final class ScanViewModel: ObservableObject {
             windowTitle: title.isEmpty ? nil : title,
             nextKey: nextKey,
             sessionURL: libraryStore.paths.sessionURL(for: entry.id),
-            resume: false,
+            resume: shouldResume,
             overwrite: true
         )
 
         let stopController = SignalStopController()
         self.stopController = stopController
         isRunning = true
-        capturedPageCount = 0
+        if !shouldResume {
+            capturedPageCount = 0
+        }
         statusMessage = "スキャン中"
 
         let entryID = entry.id
