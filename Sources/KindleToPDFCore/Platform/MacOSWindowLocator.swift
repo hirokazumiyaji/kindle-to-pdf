@@ -11,12 +11,21 @@ enum KindleApplicationMatcher {
     }
 }
 
-public struct MacOSWindowLocator: WindowLocating {
+enum KindleWindowFilter {
+    static func contentWindows(
+        from windows: [KindleWindow],
+        minimumHeight: CGFloat = 200
+    ) -> [KindleWindow] {
+        windows.filter { $0.bounds.height >= minimumHeight }
+    }
+}
+
+public struct MacOSWindowLocator: WindowLocating, WindowListing {
     static let windowListOptions: CGWindowListOption = [.excludeDesktopElements]
 
     public init() {}
 
-    public func locate(title: String?) throws -> KindleWindow {
+    public func listWindows() throws -> [KindleWindow] {
         let applications = NSWorkspace.shared.runningApplications.filter { application in
             KindleApplicationMatcher.matches(
                 localizedName: application.localizedName,
@@ -48,6 +57,10 @@ public struct MacOSWindowLocator: WindowLocating {
                 bounds: bounds
             )
         }
-        return try WindowSelector.select(from: windows, title: title)
+        return KindleWindowFilter.contentWindows(from: windows)
+    }
+
+    public func locate(title: String?) throws -> KindleWindow {
+        try WindowSelector.select(from: try listWindows(), title: title)
     }
 }
