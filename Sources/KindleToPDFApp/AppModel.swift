@@ -8,6 +8,15 @@ final class AppModel: ObservableObject {
     let settingsStore: AppSettingsStore
     let permissionChecker: MacOSPermissionChecker
     let settingsViewModel: SettingsViewModel
+    lazy var scanViewModel: ScanViewModel = ScanViewModel(
+        libraryStore: libraryStore,
+        presentPermissionsIfNeeded: { [weak self] in
+            self?.presentPermissionsIfNeeded() ?? true
+        },
+        settingsProvider: { [weak self] in
+            self?.settings ?? .default
+        }
+    )
 
     @Published var selectedSection: AppSection = .scan
     @Published var settings: AppSettings
