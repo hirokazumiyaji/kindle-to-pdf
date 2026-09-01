@@ -24,6 +24,20 @@ final class AppModel: ObservableObject {
             self?.selectedSection = .scan
         }
     )
+    lazy var setupViewModel: SetupViewModel = SetupViewModel(
+        settingsStore: settingsStore,
+        paths: libraryStore.paths,
+        presentPermissionsIfNeeded: { [weak self] in
+            self?.presentPermissionsIfNeeded() ?? true
+        },
+        settingsProvider: { [weak self] in
+            self?.settings ?? .default
+        },
+        onSettingsSaved: { [weak self] settings in
+            self?.settings = settings
+            self?.settingsViewModel.draft.globalCropInsets = settings.globalCropInsets
+        }
+    )
 
     @Published var selectedSection: AppSection = .scan
     @Published var settings: AppSettings

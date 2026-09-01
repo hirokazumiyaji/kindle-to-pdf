@@ -15,10 +15,10 @@ struct RootView: View {
                 ScanView(viewModel: model.scanViewModel)
             case .library:
                 LibraryView(viewModel: model.libraryViewModel)
+            case .setup:
+                SetupView(viewModel: model.setupViewModel)
             case .settings:
                 SettingsView(viewModel: model.settingsViewModel)
-            default:
-                Text(model.selectedSection.title)
             }
         }
         .sheet(isPresented: $model.showPermissionSheet) {
