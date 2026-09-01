@@ -41,7 +41,8 @@ public final class CaptureCoordinator {
 
     public func run(
         options: CaptureOptions,
-        stopRequested: @escaping () -> Bool
+        stopRequested: @escaping () -> Bool,
+        onProgress: ((Int) -> Void)? = nil
     ) throws {
         let sessionURL = options.sessionURL ?? options.outputURL
             .deletingPathExtension()
@@ -84,6 +85,7 @@ public final class CaptureCoordinator {
                 status: .capturing
             )
             try store.save(state)
+            onProgress?(state.capturedPageCount)
         }
 
         var activeKey = options.nextKey
@@ -106,6 +108,7 @@ public final class CaptureCoordinator {
             state.lastImageHash = hash(pageData)
             try store.save(state)
             previousImage = nextImage
+            onProgress?(state.capturedPageCount)
         }
 
         try pdfWriter.write(

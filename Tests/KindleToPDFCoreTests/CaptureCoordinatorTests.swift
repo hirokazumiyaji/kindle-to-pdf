@@ -140,6 +140,19 @@ final class CaptureCoordinatorTests: XCTestCase {
         XCTAssertEqual(fixture.savedPageCount, 2)
         XCTAssertEqual(fixture.pdfWriter.writtenImageCount, 2)
     }
+
+    func testReportsProgressAfterEachSavedPage() throws {
+        let fixture = try CaptureFixture(images: [.black, .white, .white, .black, .black])
+        var progress: [Int] = []
+
+        try fixture.coordinator.run(
+            options: fixture.options(pageCount: 3),
+            stopRequested: { false },
+            onProgress: { progress.append($0) }
+        )
+
+        XCTAssertEqual(progress, [1, 2, 3])
+    }
 }
 
 private struct AllowingPermissionChecker: PermissionChecking {
