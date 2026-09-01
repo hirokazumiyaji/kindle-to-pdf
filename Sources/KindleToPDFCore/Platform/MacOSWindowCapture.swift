@@ -3,6 +3,8 @@ import CoreGraphics
 public struct MacOSWindowCapture: WindowCapturing {
     private let imageProvider: (CGWindowID) -> CGImage?
     private let cropper: EdgeBackgroundCropper
+    private let manualCropper: ManualInsetCropper
+    private let insets: CropInsets?
 
     public init() {
         self.init(imageProvider: { windowID in
@@ -17,16 +19,24 @@ public struct MacOSWindowCapture: WindowCapturing {
 
     init(
         imageProvider: @escaping (CGWindowID) -> CGImage?,
-        cropper: EdgeBackgroundCropper = EdgeBackgroundCropper()
+        cropper: EdgeBackgroundCropper = EdgeBackgroundCropper(),
+        manualCropper: ManualInsetCropper = ManualInsetCropper(),
+        insets: CropInsets? = nil
     ) {
         self.imageProvider = imageProvider
         self.cropper = cropper
+        self.manualCropper = manualCropper
+        self.insets = insets
     }
 
     public func capture(window: KindleWindow) throws -> CGImage {
         guard let image = imageProvider(CGWindowID(window.windowID)) else {
             throw PlatformError.unableToCaptureWindow(window.windowID)
         }
-        return cropper.crop(image)
+        let cropped = cropper.crop(image)
+        if let insets, !insets.isZero {
+            return manualCropper.crop(cropped, insets: insets)
+        }
+        return cropped
     }
 }
