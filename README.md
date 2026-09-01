@@ -68,10 +68,10 @@ CLI単体のApp Bundleも作成できます。
 zsh scripts/package-app.sh cli "$HOME/Documents/KindleToPDFCLI.app"
 ```
 
-第1引数にパスだけを渡す従来の呼び出しも、CLIパッケージとして動作します。
+第1引数にパスだけを渡す従来の呼び出しも、CLIパッケージとして動作します。GUI既定パスには向けないでください。
 
 ```bash
-zsh scripts/package-app.sh "$HOME/Documents/KindleToPDF.app"
+zsh scripts/package-app.sh "$HOME/Documents/KindleToPDFCLI.app"
 ```
 
 リリースバイナリだけが必要な場合は次でも構いません。

@@ -19,6 +19,7 @@ fi
 
 swift build -c release
 mkdir -p "$destination/Contents/MacOS"
+rm -f "$destination/Contents/MacOS/kindle-to-pdf" "$destination/Contents/MacOS/KindleToPDFApp"
 
 if [[ "$mode" == "cli" ]]; then
   cp "$project_root/.build/release/kindle-to-pdf" "$destination/Contents/MacOS/kindle-to-pdf"
