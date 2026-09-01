@@ -57,10 +57,6 @@ public final class LibraryStore {
         var entry = entry
         entry.updatedAt = Date()
         try ensureLayout()
-        try fileManager.createDirectory(
-            at: paths.sessionURL(for: entry.id),
-            withIntermediateDirectories: true
-        )
         let data = try encoder.encode(entry)
         try data.write(to: paths.entryURL(for: entry.id), options: .atomic)
     }

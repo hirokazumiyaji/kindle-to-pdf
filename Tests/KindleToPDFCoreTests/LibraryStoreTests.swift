@@ -27,12 +27,27 @@ final class LibraryStoreTests: XCTestCase {
         second.status = .completed
         try store.save(second)
         // create dummy session + pdf files
-        try Data().write(to: store.paths.sessionURL(for: second.id).appendingPathComponent("state.json"))
+        let sessionURL = store.paths.sessionURL(for: second.id)
+        try FileManager.default.createDirectory(at: sessionURL, withIntermediateDirectories: true)
+        try Data().write(to: sessionURL.appendingPathComponent("state.json"))
         try Data().write(to: store.paths.pdfURL(for: second.id))
 
         XCTAssertEqual(try store.list().map(\.displayName), ["B", "A"])
         try store.delete(id: second.id)
         XCTAssertEqual(try store.list().map(\.displayName), ["A"])
         XCTAssertFalse(FileManager.default.fileExists(atPath: store.paths.pdfURL(for: second.id).path))
+    }
+
+    func testSaveDoesNotCreateSessionDirectory() throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        let store = LibraryStore(rootURL: root)
+        let entry = store.makeNewEntry(displayName: "Sample", requestedPageCount: nil)
+
+        try store.save(entry)
+
+        XCTAssertFalse(
+            FileManager.default.fileExists(atPath: store.paths.sessionURL(for: entry.id).path),
+            "LibraryStore.save must not create Sessions/<id>; CaptureCoordinator treats an existing session dir as sessionAlreadyExists"
+        )
     }
 }
