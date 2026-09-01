@@ -10,7 +10,28 @@ struct RootView: View {
                     .tag(section)
             }
         } detail: {
-            Text(model.selectedSection.title)
+            switch model.selectedSection {
+            case .settings:
+                SettingsView(viewModel: model.settingsViewModel)
+            default:
+                Text(model.selectedSection.title)
+            }
+        }
+        .sheet(isPresented: $model.showPermissionSheet) {
+            PermissionSetupSheet(status: model.permissionStatus) {
+                model.refreshPermissionStatus()
+                if !model.needsPermissionSetup {
+                    model.showPermissionSheet = false
+                }
+            }
+        }
+        .onAppear {
+            model.presentPermissionsIfNeeded()
+        }
+        .onChange(of: model.selectedSection) { section in
+            if section == .scan {
+                model.presentPermissionsIfNeeded()
+            }
         }
     }
 }

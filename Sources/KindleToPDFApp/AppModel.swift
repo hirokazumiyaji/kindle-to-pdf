@@ -2,12 +2,21 @@ import Combine
 import Foundation
 import KindleToPDFCore
 
+@MainActor
 final class AppModel: ObservableObject {
     let libraryStore: LibraryStore
     let settingsStore: AppSettingsStore
+    let permissionChecker: MacOSPermissionChecker
+    let settingsViewModel: SettingsViewModel
 
     @Published var selectedSection: AppSection = .scan
     @Published var settings: AppSettings
+    @Published var permissionStatus: PermissionStatus
+    @Published var showPermissionSheet = false
+
+    var needsPermissionSetup: Bool {
+        !permissionStatus.accessibility || !permissionStatus.screenRecording
+    }
 
     init() {
         let defaultPaths = LibraryPaths(rootURL: LibraryPaths.defaultRootURL)
@@ -23,9 +32,31 @@ final class AppModel: ObservableObject {
             fallback.libraryRootPath = rootURL.path
             return fallback
         }()
+        let permissionChecker = MacOSPermissionChecker()
+        let permissionStatus = permissionChecker.status()
 
         self.libraryStore = libraryStore
         self.settingsStore = settingsStore
         self.settings = settings
+        self.permissionChecker = permissionChecker
+        self.permissionStatus = permissionStatus
+        self.settingsViewModel = SettingsViewModel(store: settingsStore, settings: settings)
+        self.showPermissionSheet = !permissionStatus.accessibility || !permissionStatus.screenRecording
+    }
+
+    func refreshPermissionStatus() {
+        permissionStatus = permissionChecker.status()
+    }
+
+    /// Shows the setup sheet when Accessibility or Screen Recording is missing.
+    /// Returns true if the caller should block (for example scan start).
+    @discardableResult
+    func presentPermissionsIfNeeded() -> Bool {
+        refreshPermissionStatus()
+        if needsPermissionSetup {
+            showPermissionSheet = true
+            return true
+        }
+        return false
     }
 }

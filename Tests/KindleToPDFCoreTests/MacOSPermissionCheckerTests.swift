@@ -34,4 +34,16 @@ final class MacOSPermissionCheckerTests: XCTestCase {
         XCTAssertThrowsError(try checker.check())
         XCTAssertEqual(requestCount, 1)
     }
+
+    func testReportsPermissionStatusWithoutThrowing() {
+        let checker = MacOSPermissionChecker(
+            executablePath: "/tmp/x",
+            accessibilityTrusted: { false },
+            screenCaptureAuthorized: { true },
+            requestScreenCapture: { true }
+        )
+        let status = checker.status()
+        XCTAssertFalse(status.accessibility)
+        XCTAssertTrue(status.screenRecording)
+    }
 }
