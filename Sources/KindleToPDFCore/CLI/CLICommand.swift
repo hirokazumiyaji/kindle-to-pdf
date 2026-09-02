@@ -2,12 +2,24 @@ import Foundation
 
 public enum NextKey: String, Equatable, Codable {
     case right
+    case left
     case pagedown
+
+    public var alternate: NextKey? {
+        switch self {
+        case .right:
+            return .left
+        case .left:
+            return .right
+        case .pagedown:
+            return .left
+        }
+    }
 }
 
 public struct CaptureOptions: Equatable {
     public let outputURL: URL
-    public let pageCount: Int
+    public let pageCount: Int?
     public let windowTitle: String?
     public let nextKey: NextKey
     public let sessionURL: URL?
@@ -16,7 +28,7 @@ public struct CaptureOptions: Equatable {
 
     public init(
         outputURL: URL,
-        pageCount: Int,
+        pageCount: Int?,
         windowTitle: String?,
         nextKey: NextKey,
         sessionURL: URL?,
@@ -30,6 +42,10 @@ public struct CaptureOptions: Equatable {
         self.sessionURL = sessionURL
         self.resume = resume
         self.overwrite = overwrite
+    }
+
+    public var requestedPageCountForSession: Int {
+        pageCount ?? 0
     }
 }
 

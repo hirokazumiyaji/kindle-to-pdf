@@ -4,6 +4,10 @@ public protocol WindowLocating {
     func locate(title: String?) throws -> KindleWindow
 }
 
+public protocol WindowListing {
+    func listWindows() throws -> [KindleWindow]
+}
+
 public protocol PageTurning {
     func turn(window: KindleWindow, key: NextKey) throws
 }

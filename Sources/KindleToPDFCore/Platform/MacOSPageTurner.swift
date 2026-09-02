@@ -9,6 +9,8 @@ public struct MacOSPageTurner: PageTurning {
         switch key {
         case .right:
             virtualKey = CGKeyCode(kVK_RightArrow)
+        case .left:
+            virtualKey = CGKeyCode(kVK_LeftArrow)
         case .pagedown:
             virtualKey = CGKeyCode(kVK_PageDown)
         }
@@ -24,7 +26,11 @@ public struct MacOSPageTurner: PageTurning {
         ) else {
             throw PlatformError.unableToCreateKeyboardEvent
         }
-        keyDown.postToPid(pid_t(window.processID))
-        keyUp.postToPid(pid_t(window.processID))
+
+        // Kindle ignores process-targeted key events unless it is frontmost.
+        // Post through the HID tap after activation so the frontmost Kindle receives them.
+        _ = window.processID
+        keyDown.post(tap: .cghidEventTap)
+        keyUp.post(tap: .cghidEventTap)
     }
 }
