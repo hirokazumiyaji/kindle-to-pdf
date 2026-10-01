@@ -9,9 +9,12 @@ final class SetupViewModel: ObservableObject {
     @Published var previewImage: NSImage?
     @Published var isRunning = false
     @Published var message: String?
+    @Published var windowTitle = ""
+    @Published var availableWindows: [KindleWindow] = []
 
     private let settingsStore: AppSettingsStore
     private let paths: LibraryPaths
+    private let windowListing: any WindowListing
     private let presentPermissionsIfNeeded: () -> Bool
     private let settingsProvider: () -> AppSettings
     private let onSettingsSaved: (AppSettings) -> Void
@@ -25,12 +28,14 @@ final class SetupViewModel: ObservableObject {
     init(
         settingsStore: AppSettingsStore,
         paths: LibraryPaths,
+        windowListing: any WindowListing = MacOSWindowLocator(),
         presentPermissionsIfNeeded: @escaping () -> Bool,
         settingsProvider: @escaping () -> AppSettings,
         onSettingsSaved: @escaping (AppSettings) -> Void
     ) {
         self.settingsStore = settingsStore
         self.paths = paths
+        self.windowListing = windowListing
         self.presentPermissionsIfNeeded = presentPermissionsIfNeeded
         self.settingsProvider = settingsProvider
         self.onSettingsSaved = onSettingsSaved
@@ -50,6 +55,15 @@ final class SetupViewModel: ObservableObject {
         refreshPreview()
     }
 
+    func refreshWindows() {
+        do {
+            availableWindows = try windowListing.listWindows()
+        } catch {
+            availableWindows = []
+            message = Self.message(for: error)
+        }
+    }
+
     func runTestScan() async {
         guard !isRunning else { return }
         if presentPermissionsIfNeeded() { return }
@@ -62,10 +76,11 @@ final class SetupViewModel: ObservableObject {
         let outputURL = outputURL
         let settings = settingsProvider()
         let coordinator = makeCoordinator()
+        let title = windowTitle.trimmingCharacters(in: .whitespacesAndNewlines)
         let options = CaptureOptions(
             outputURL: outputURL,
             pageCount: Self.testPageCount,
-            windowTitle: nil,
+            windowTitle: title.isEmpty ? nil : title,
             nextKey: settings.defaultNextKey,
             sessionURL: sessionURL,
             resume: false,
@@ -99,6 +114,11 @@ final class SetupViewModel: ObservableObject {
             cgImage: cropped,
             size: NSSize(width: cropped.width, height: cropped.height)
         )
+    }
+
+    var baseImageSize: CGSize? {
+        guard let baseImage else { return nil }
+        return CGSize(width: baseImage.width, height: baseImage.height)
     }
 
     func saveAsDefaults() throws {

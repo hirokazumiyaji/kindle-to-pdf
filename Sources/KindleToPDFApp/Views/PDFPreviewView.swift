@@ -9,9 +9,25 @@ struct PDFPreviewItem: Identifiable {
 
 struct PDFPreviewView: View {
     let url: URL
+    @Environment(\.dismiss) private var dismiss
 
     var body: some View {
-        PDFKitRepresentedView(url: url)
+        VStack(spacing: 0) {
+            HStack {
+                Text(url.lastPathComponent)
+                    .font(.headline)
+                    .lineLimit(1)
+                    .truncationMode(.middle)
+                Spacer()
+                Button("閉じる") {
+                    dismiss()
+                }
+                .keyboardShortcut(.cancelAction)
+            }
+            .padding([.horizontal, .top])
+
+            PDFKitRepresentedView(url: url)
+        }
     }
 }
 

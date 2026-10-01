@@ -26,6 +26,23 @@ struct SetupView: View {
                 }
             }
 
+            Section("ウィンドウ") {
+                Picker("Kindleウィンドウ", selection: $viewModel.windowTitle) {
+                    Text("自動").tag("")
+                    ForEach(viewModel.availableWindows, id: \.windowID) { window in
+                        Text(window.title.isEmpty ? "無題" : window.title)
+                            .tag(window.title)
+                    }
+                }
+                .disabled(viewModel.isRunning)
+                TextField("ウィンドウタイトル（任意）", text: $viewModel.windowTitle)
+                    .disabled(viewModel.isRunning)
+                Button("ウィンドウを再読み込み") {
+                    viewModel.refreshWindows()
+                }
+                .disabled(viewModel.isRunning)
+            }
+
             Section("手動 inset") {
                 insetSlider("上", keyPath: \.top)
                 insetSlider("下", keyPath: \.bottom)
@@ -60,28 +77,68 @@ struct SetupView: View {
         .padding()
         .onAppear {
             viewModel.reloadInsetsFromSettings()
+            viewModel.refreshWindows()
         }
     }
 
+    private static let maxInsetFraction = 0.5
+
     private func insetSlider(_ label: String, keyPath: WritableKeyPath<CropInsets, Int>) -> some View {
         VStack(alignment: .leading, spacing: 4) {
-            Text("\(label): \(viewModel.insets[keyPath: keyPath])")
+            HStack {
+                Text(label)
+                Spacer()
+                TextField(
+                    label,
+                    value: insetValueBinding(keyPath),
+                    format: .number
+                )
+                .multilineTextAlignment(.trailing)
+                .frame(width: 80)
+                .textFieldStyle(.roundedBorder)
+                .disabled(viewModel.isRunning)
+            }
             Slider(
                 value: insetBinding(keyPath),
-                in: 0...100,
+                in: insetRange(keyPath),
                 step: 1
             )
             .disabled(viewModel.isRunning)
         }
     }
 
+    /// スライダーの上限はテストスキャン画像の各辺に対する割合で決める。
+    /// キャプチャはRetinaで数千pxになるため、固定のpx上限では足りなくなる。
+    private func insetRange(_ keyPath: WritableKeyPath<CropInsets, Int>) -> ClosedRange<Double> {
+        guard let size = viewModel.baseImageSize else { return 0...100 }
+        let isHorizontal = keyPath == \CropInsets.left || keyPath == \CropInsets.right
+        let dimension = isHorizontal ? size.width : size.height
+        let maxInset = (dimension * Self.maxInsetFraction).rounded()
+        return 0...max(100, maxInset)
+    }
+
     private func insetBinding(_ keyPath: WritableKeyPath<CropInsets, Int>) -> Binding<Double> {
         Binding(
             get: { Double(viewModel.insets[keyPath: keyPath]) },
             set: { newValue in
-                viewModel.insets[keyPath: keyPath] = Int(newValue.rounded())
-                viewModel.refreshPreview()
+                updateInset(Int(newValue.rounded()), keyPath: keyPath)
             }
         )
+    }
+
+    private func insetValueBinding(_ keyPath: WritableKeyPath<CropInsets, Int>) -> Binding<Int> {
+        Binding(
+            get: { viewModel.insets[keyPath: keyPath] },
+            set: { newValue in
+                updateInset(newValue, keyPath: keyPath)
+            }
+        )
+    }
+
+    private func updateInset(_ value: Int, keyPath: WritableKeyPath<CropInsets, Int>) {
+        let range = insetRange(keyPath)
+        let clampedValue = min(max(value, Int(range.lowerBound)), Int(range.upperBound))
+        viewModel.insets[keyPath: keyPath] = clampedValue
+        viewModel.refreshPreview()
     }
 }

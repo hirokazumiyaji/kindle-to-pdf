@@ -56,6 +56,20 @@ final class ScanViewModel: ObservableObject {
         statusMessage = "未完了セッションを再開します"
     }
 
+    /// 再開モードを解除して、新規スキャンのフォームに戻す。
+    func cancelResume() {
+        guard resume else { return }
+        let settings = settingsProvider()
+        resume = false
+        resumeEntryID = nil
+        displayName = ""
+        pageCountText = settings.defaultPageCount.map(String.init) ?? ""
+        nextKey = settings.defaultNextKey
+        capturedPageCount = 0
+        errorMessage = nil
+        statusMessage = ""
+    }
+
     func start() {
         guard !isRunning else { return }
         if presentPermissionsIfNeeded() { return }

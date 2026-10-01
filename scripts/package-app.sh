@@ -28,6 +28,8 @@ if [[ "$mode" == "cli" ]]; then
 else
   cp "$project_root/.build/release/KindleToPDFApp" "$destination/Contents/MacOS/KindleToPDFApp"
   cp "$project_root/Resources/AppInfo.plist" "$destination/Contents/Info.plist"
+  mkdir -p "$destination/Contents/Resources"
+  cp "$project_root/Resources/AppIcon.icns" "$destination/Contents/Resources/AppIcon.icns"
   codesign --force --sign - "$destination/Contents/MacOS/KindleToPDFApp"
 fi
 codesign --force --sign - "$destination"

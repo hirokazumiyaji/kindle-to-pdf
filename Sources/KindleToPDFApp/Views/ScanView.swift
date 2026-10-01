@@ -45,6 +45,10 @@ struct ScanView: View {
                 if viewModel.resume {
                     Text("未完了セッションを再開します")
                         .foregroundStyle(.secondary)
+                    Button("新規スキャンとして始める") {
+                        viewModel.cancelResume()
+                    }
+                    .disabled(viewModel.isRunning)
                 }
                 if !viewModel.statusMessage.isEmpty {
                     Text(viewModel.statusMessage)
