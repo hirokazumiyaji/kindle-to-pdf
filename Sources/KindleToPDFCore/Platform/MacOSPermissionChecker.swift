@@ -49,6 +49,24 @@ public struct MacOSPermissionChecker: PermissionChecking {
         )
     }
 
+    /// アクセシビリティの権限要求ダイアログを表示し、
+    /// システム設定のアクセシビリティのリストへ本アプリを登録します。
+    public func requestAccessibility() {
+        _ = accessibilityTrusted()
+    }
+
+    /// 画面収録の権限要求ダイアログを表示し、
+    /// システム設定の画面収録のリストへ本アプリを登録します。
+    public func requestScreenRecording() {
+        _ = requestScreenCapture()
+    }
+
+    /// 両方の権限要求ダイアログを表示します。
+    public func requestPermissions() {
+        requestAccessibility()
+        requestScreenRecording()
+    }
+
     public func check() throws {
         var missing: [String] = []
         if !accessibilityTrusted() {
